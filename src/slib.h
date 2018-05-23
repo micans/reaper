@@ -53,8 +53,8 @@
 #endif
 
 
-#if WE_USE_ZLIB                 /* the ZFILE abstraction carries some intricacies */
-#include <zlib.h>
+#if WE_USE_ZLIB   /* the ZFILE abstraction carries some idiosyncratic intricacies. It's ugly, but there are reasons */
+#include <zlib.h> /* Sadly this margin etc etc */
 typedef gzFile ZFILE;
 #define  ZWMODE "wb" COMPRESSION_LEVEL
 #define  ZRMODE "rb"

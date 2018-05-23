@@ -183,7 +183,7 @@ int main
 )
    {  unsigned long n_data_alloc = 1<<20
    ;  unsigned char* data = myalloc(n_data_alloc)  /* must be bigger than BUFSIZE + 1 */
-   ;  ZFILE fpo = stdout
+   ;  ZFILE fpo = NULL
    ;  ZFILE input
 #define BUFSIZE 4096
    ;  unsigned long N = 0, n_offsets = 0, n_offsets_alloc = 1<<10
