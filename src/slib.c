@@ -502,7 +502,7 @@ unsigned char* read_a_file
    ;  while ((n = fread(d+N, 1, BUFSIZE, ip)) > 0)
 #endif
       {  if (N+n+2+4096 > n_data_alloc)     /* extra space to write \n \0 at EOF */
-         {  n_data_alloc *= 1.141
+         {  n_data_alloc *= 1.414
          ;  if (n_data_alloc < N+n+2+4096)
             n_data_alloc = N+n+2+10*4096
          ;  d = realloc(d, n_data_alloc)
@@ -553,7 +553,7 @@ unsigned char* read_file
    ;  while ((n = fread(data+N, 1, BUFSIZE, ip)) > 0)
 #endif
       {  if (N+n+2+BUFSIZE > n_data_alloc)     /* extra space to write '\0', optionally '\n\0 */
-         {  n_data_alloc *= 1.141
+         {  n_data_alloc *= 1.414
          ;  if (n_data_alloc < N+n+2+BUFSIZE)
             n_data_alloc = N+n+2+10*BUFSIZE
          ;  data = myrealloc(data, n_data_alloc)
