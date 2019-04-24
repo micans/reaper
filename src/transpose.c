@@ -249,7 +249,7 @@ exit(0);
    ;  while ((n = fread(data+N, 1, BUFSIZE, input)) > 0)
 #endif
       {  if (N+n+2+BUFSIZE > n_data_alloc)     /* extra space to write '\0', optionally '\n\0' */
-         {  n_data_alloc *= 1.141
+         {  n_data_alloc *= 1.414
          ;  if (n_data_alloc < N+n+2+BUFSIZE)
             n_data_alloc = N+n+2+10*BUFSIZE
          ;  data = myrealloc(data, n_data_alloc)
@@ -260,7 +260,7 @@ exit(0);
       ;  {  unsigned char* o = data+N, *p = o
          ;  while (p-o < n && (p = memchr(p, g_nl, n-(p-o))))
             {  if (n_offsets+1 > n_offsets_alloc)       /* extra space in case no trailing g_nl */
-               {  n_offsets_alloc *= 1.141
+               {  n_offsets_alloc *= 1.414
                ;  offsets = myrealloc(offsets, n_offsets_alloc * sizeof offsets[0])
             ;  }
                offsets[n_offsets].this = p-data
