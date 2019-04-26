@@ -273,6 +273,7 @@ exit(0);
    ;  }
 
       myfzclose(input, 1)
+  ;   arrr("Read %lu bytes", N-2)
 
   ;   if (g_nl != '\n' && data[N-1] == '\n')
          data[--N] = '\0'
