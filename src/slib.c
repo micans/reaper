@@ -195,7 +195,7 @@ void* myfopen (const char* fname, const char* mode, int z)
       else if (!strcmp(fname, "stderr") && !strchr(mode, 'w'))
       fp = stderr
    ;  else
-      {  fp = fopen(fname, do_read ? "rb" : "wb")
+      {  fp = fopen(fname, do_read ? "r" : "wb")
       ;  if (!fp)
          arrr("cannae open file <%s> in mode <%s>", fname, mode)
    ;  }

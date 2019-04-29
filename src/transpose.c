@@ -61,7 +61,7 @@ int field_check_ok
 ,  unsigned long n_offsets
 )
    {  int ret = 1
-   ;  unsigned long i
+   ;  unsigned long i = 0
 
    ;  for (i=0;i<n_offsets-1;i++)
       {  unsigned char* o = data+offsets[i].this, *p = o, *z = o + offsets[i].next
@@ -79,8 +79,9 @@ fprintf(stderr, "line %lu this %lu next %lu nsep %lu\n", i, offsets[i].this, off
                             * -- it may be meaningless and hence missing. Additionally,
                             * the separator may be mising as well.
                            */
+      if (g_check || g_strict)
       {  unsigned long n_nok = 0, reference = offsets[1].n_sep
-      ;  if (g_check && n_offsets > 1)
+      ;  if (n_offsets > 1)
          arrr("Second record has %lu fields", (offsets[1].n_sep+1))
       ;  for (i=2;i<n_offsets-1;i++)
          if (offsets[i].n_sep != reference)
@@ -88,12 +89,12 @@ fprintf(stderr, "line %lu this %lu next %lu nsep %lu\n", i, offsets[i].this, off
          ,  n_nok++
       ;  if (n_nok)
          fprintf(stderr, " (line no/field count)\n")
-      ;  if (g_check)
-         exit(n_nok ? 1 : 0)
-      ;  else if (g_strict && n_nok)
-            arrr("Count discrepancies found, used second line as reference with %lu fields", reference+1)
-         ,  exit(1)
-   ;  }
+      ;  if (n_nok)
+         {  arrr("Count discrepancies found, used second line as reference with %lu fields", reference+1)
+         ;  if (g_check)
+            exit(1)
+      ;  }
+      }
 
                      /* Below comparison looks crazy. That's because we also counted the
                       * fake tab that exists as a precaution. It was easiest to do that the
@@ -101,6 +102,7 @@ fprintf(stderr, "line %lu this %lu next %lu nsep %lu\n", i, offsets[i].this, off
                       * because if the identity is true we have in fact an off-by-one situation,
                       * indicating a header line with one fewer element than the second line.
                      */
+/* arrr(" - %lu - %lu - %lu -\n", i, offsets[0].n_sep, offsets[1].n_sep); */
       if (i >= 2 && offsets[0].n_sep == offsets[1].n_sep)
          arrr
          (  "first and second line have %lu and %lu separators; I'll add a leading separator"
@@ -183,7 +185,7 @@ int main
 )
    {  unsigned long n_data_alloc = 1<<20
    ;  unsigned char* data = myalloc(n_data_alloc)  /* must be bigger than BUFSIZE + 1 */
-   ;  ZFILE fpo = NULL
+   ;  void* fpo = NULL
    ;  ZFILE input
 #define BUFSIZE 4096
    ;  unsigned long N = 0, n_offsets = 0, n_offsets_alloc = 1<<10
@@ -265,6 +267,7 @@ exit(0);
             ;  }
                offsets[n_offsets].this = p-data
             ;  offsets[n_offsets-1].next = p-data
+            ;  offsets[n_offsets-1].n_sep = 0
             ;  n_offsets++
             ;  p++
          ;  }
@@ -273,17 +276,21 @@ exit(0);
    ;  }
 
       myfzclose(input, 1)
-  ;   arrr("Read %lu bytes", N-2)
+   ;  arrr("Read %lu bytes", N-2)
 
-  ;   if (g_nl != '\n' && data[N-1] == '\n')
+   ;  if (g_nl != '\n' && data[N-1] == '\n')
          data[--N] = '\0'
       ,  removed_last_newline = 1
 
-  ;   if (N > 0 && data[N-1] != g_nl)
+   ;  offsets[n_offsets-1].next  = N
+   ;  offsets[n_offsets-1].n_sep = 0
+
+   ;  if (N > 0 && data[N-1] != g_nl)
       {  data[N]  = g_nl
       ;  data[N+1] = '\0'
-      ;  offsets[n_offsets-1].next = N
-      ;  offsets[n_offsets].this = N
+      ;  offsets[n_offsets].next = N
+      ;  offsets[n_offsets].this   = N
+      ;  offsets[n_offsets].n_sep  = 0
       ;  n_offsets++
       ;  N++
    ;  }
