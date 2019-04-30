@@ -1,8 +1,8 @@
 
 /*
  * (C) Copyright 2011, 2012, 2013, 2014, 2015 European Molecular Biology Laboratory.
- * Author: Stijn van Dongen <stijn@ebi.ac.uk>.
- * Contact: <kraken@ebi.ac.uk>
+ * Author: Stijn van Dongen <micans@gmail.com>
+ * Contact: <micans@gmail.com>
  *
  * This file is part of Reaper.   Reaper is free software: you can redistribute
  * it  and/or modify it under the terms of the  GNU  General  Public License as

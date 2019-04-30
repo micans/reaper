@@ -45,7 +45,7 @@ int removed_last_newline = 0;
 #define G_CHECK_VERBOSE       2
 #define G_CHECK_ALL           (G_CHECK_RECTANGULAR | G_CHECK_VERBOSE)
 
-int g_debug = 0, g_check = 0, g_strict = 1;
+int g_debug = 0, g_check = 0, g_strict = 1, g_mike = 1;
 
 
 
@@ -94,10 +94,12 @@ fprintf(stderr, "line %lu this %lu next %lu nsep %lu\n", i, offsets[i].this, off
          if (n_nok)
          {  if (g_check & G_CHECK_VERBOSE)
             fprintf(stderr, " (line no/field count)\n")
-         ;  arrr("Count discrepancies found, used second line as reference with %lu fields, %lu lines total", reference+1, n_offsets)
+         ;  if (g_mike)
+            arrr("Count discrepancies found, used second line as reference with %lu fields, %lu lines total", reference+1, (n_offsets-1))
          ;  exit((g_check || g_strict) ? 1 : 0)
       ;  }
 
+         if (g_mike)
          arrr("Have %lu x %lu matrix", (n_offsets-1), (offsets[1].n_sep+1))
 
       ;  if (g_check)
@@ -106,10 +108,15 @@ fprintf(stderr, "line %lu this %lu next %lu nsep %lu\n", i, offsets[i].this, off
                            /* NOTE for the first line an artificial separator was added (add_fake_tab)
                             * Hence we do not have offsets[0].n_sep+1 as above
                            */
-      else if (n_offsets == 2)
+      else if (n_offsets == 2 && g_mike)
       arrr("Have %lu x %lu matrix", (n_offsets-1), (offsets[0].n_sep))
    ;  else
-      arrr("Have 0 x 0 matrix")
+      arrr("Have 0 x 0 matrix")     /* This is unreachable code; an empty file will be considered
+                                     * to have a single cell with an empty string in it.
+                                    */
+
+   ;  if (g_check)
+      exit(0)
    ;
 
                      /* (add_fake_tab) Below comparison looks crazy. That's because we also counted the
@@ -119,7 +126,7 @@ fprintf(stderr, "line %lu this %lu next %lu nsep %lu\n", i, offsets[i].this, off
                       * indicating a header line with one fewer element than the second line.
                      */
 /* arrr(" - %lu - %lu - %lu -\n", i, offsets[0].n_sep, offsets[1].n_sep); */
-      if (i >= 2 && offsets[0].n_sep == offsets[1].n_sep)
+      if (i >= 2 && offsets[0].n_sep == offsets[1].n_sep && g_mike)
          arrr
          (  "first and second line have %lu and %lu separators; I'll add a leading separator"
          ,  offsets[0].n_sep-1
@@ -227,12 +234,14 @@ int main
       uniarg("--check")          g_check = G_CHECK_RECTANGULAR; endarg()
       uniarg("--check-verbose")  g_check = G_CHECK_ALL; endarg()
       uniarg("--pad-ragged") g_strict = 0; endarg()
+      uniarg("--quiet") g_mike = 0; endarg()
    uniarg("-h")
 puts("-i <fname>        input stream (gzipped file allowed)");
 puts("-o <fname>        output stream (gzipped file allowed)");
 puts("-t <CHAR>         field delimiter (default TAB)");
 puts("-n <CHAR>         record delimiter (default NEWLINE)");
 puts("--debug           output record offset information");
+puts("--quiet           no messages");
 puts("--check           check table consistency (rectangulosity) and exit");
 puts("--check-verbose   as above, output offending lines + field counts");
 puts("--pad-ragged      allow ragged table input, pad output");
@@ -294,7 +303,8 @@ exit(0);
    ;  }
 
       myfzclose(input, 1)
-   ;  arrr("Read %lu bytes", N-2)
+   ;  if (g_mike)
+      arrr("Read %lu bytes", N-2)
 
    ;  if (g_nl != '\n' && data[N-1] == '\n')
          data[--N] = '\0'

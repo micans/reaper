@@ -90,7 +90,7 @@ int argh
    ;  vfprintf(fp, fmt, args)
    ;  fputc('\n', fp)
    ;  va_end(args)
-   ;  return 29
+   ;  return 29         /* Not sure what I was thinking */
 ;  }
 
 
@@ -106,7 +106,7 @@ int arrr
    ;  vfprintf(fp, fmt, args)
    ;  fputc('\n', fp)
    ;  va_end(args)
-   ;  return 29
+   ;  return 29         /* Not sure what I was thinking */
 ;  }
 
 
