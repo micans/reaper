@@ -40,6 +40,11 @@ unsigned char g_tab = '\t';
 unsigned char g_nl  = '\n';
 int removed_last_newline = 0;
 
+
+#define G_CHECK_RECTANGULAR   1
+#define G_CHECK_VERBOSE       2
+#define G_CHECK_ALL           (G_CHECK_RECTANGULAR | G_CHECK_VERBOSE)
+
 int g_debug = 0, g_check = 0, g_strict = 1;
 
 
@@ -70,8 +75,6 @@ int field_check_ok
          ,  p++
 ;if (g_debug)
 fprintf(stderr, "line %lu this %lu next %lu nsep %lu\n", i, offsets[i].this, offsets[i].next, offsets[i].n_sep)
-      ;  if (i == 3 && !g_check && !g_strict)
-         break
    ;  }
 
                            /* In check/strict mode we compare with the *second* record.
@@ -79,24 +82,37 @@ fprintf(stderr, "line %lu this %lu next %lu nsep %lu\n", i, offsets[i].this, off
                             * -- it may be meaningless and hence missing. Additionally,
                             * the separator may be mising as well.
                            */
-      if (g_check || g_strict)
+      if (n_offsets > 2)
       {  unsigned long n_nok = 0, reference = offsets[1].n_sep
-      ;  if (n_offsets > 1)
-         arrr("Second record has %lu fields", (offsets[1].n_sep+1))
       ;  for (i=2;i<n_offsets-1;i++)
          if (offsets[i].n_sep != reference)
+         {  if (g_check & G_CHECK_VERBOSE)
             fprintf(stderr, " %lu/%lu", (i+1), (offsets[i].n_sep+1))
-         ,  n_nok++
-      ;  if (n_nok)
-         fprintf(stderr, " (line no/field count)\n")
-      ;  if (n_nok)
-         {  arrr("Count discrepancies found, used second line as reference with %lu fields", reference+1)
-         ;  if (g_check)
-            exit(1)
+         ;  n_nok++
       ;  }
-      }
 
-                     /* Below comparison looks crazy. That's because we also counted the
+         if (n_nok)
+         {  if (g_check & G_CHECK_VERBOSE)
+            fprintf(stderr, " (line no/field count)\n")
+         ;  arrr("Count discrepancies found, used second line as reference with %lu fields, %lu lines total", reference+1, n_offsets)
+         ;  exit((g_check || g_strict) ? 1 : 0)
+      ;  }
+
+         arrr("Have %lu x %lu matrix", (n_offsets-1), (offsets[1].n_sep+1))
+
+      ;  if (g_check)
+         exit(0)
+   ;  }
+                           /* NOTE for the first line an artificial separator was added (add_fake_tab)
+                            * Hence we do not have offsets[0].n_sep+1 as above
+                           */
+      else if (n_offsets == 2)
+      arrr("Have %lu x %lu matrix", (n_offsets-1), (offsets[0].n_sep))
+   ;  else
+      arrr("Have 0 x 0 matrix")
+   ;
+
+                     /* (add_fake_tab) Below comparison looks crazy. That's because we also counted the
                       * fake tab that exists as a precaution. It was easiest to do that the
                       * way it is done, and accept this bizarre comparison -- bizarre and crazy
                       * because if the identity is true we have in fact an off-by-one situation,
@@ -208,7 +224,8 @@ int main
 #if WE_USE_ZLIB
       uniarg("--nozip")  zippit = 0;  endarg()
 #endif
-      uniarg("--check")  g_check = 1; endarg()
+      uniarg("--check")          g_check = G_CHECK_RECTANGULAR; endarg()
+      uniarg("--check-verbose")  g_check = G_CHECK_ALL; endarg()
       uniarg("--pad-ragged") g_strict = 0; endarg()
    uniarg("-h")
 puts("-i <fname>        input stream (gzipped file allowed)");
@@ -217,6 +234,7 @@ puts("-t <CHAR>         field delimiter (default TAB)");
 puts("-n <CHAR>         record delimiter (default NEWLINE)");
 puts("--debug           output record offset information");
 puts("--check           check table consistency (rectangulosity) and exit");
+puts("--check-verbose   as above, output offending lines + field counts");
 puts("--pad-ragged      allow ragged table input, pad output");
 #if WE_USE_ZLIB
 puts("--nozip           do not gzip the output");
