@@ -271,7 +271,7 @@ puts("-o <fname>        output stream (gzipped file allowed)");
 puts("-t <CHAR>         field delimiter (default TAB)");
 puts("-n <CHAR>         record delimiter (default NEWLINE)");
 puts("--pad-ragged      allow ragged table input, pad output");
-puts("--debug           output record offset information");
+puts("--debug           output some more info (use -z -z for record offset information)");
 puts("--quiet           no messages");
 puts("--check           check table consistency (rectangulosity) and exit");
 #if WE_USE_ZLIB
