@@ -3,28 +3,34 @@
 /* Author: Stijn van Dongen
 
  * features:
-    - transpose tabular data.
+    - is close to doing the very minimal amount of work required
+    - transpose tabular data without using in-memory transpose
+    - read data as string, write transpose by following array of pointers
     - record and field separator can be changed.
     - can read and write gzipped files.
-    - fast as long as data fits into memory.
     - can handle headers lacking dummy lead field.
     - in pad mode (--pad-ragged) it will padd the transposed table with empty fields
       to make it rectangular, should the input have rows with different amount of cells.
     - In normal operation, a ragged array will be considered an error and lead to termination.
+    - check mode
+
+ * caveats/TODO:
+    - A file such as this:
+\thdr2\thdr3\n
+\trowname\tcell1\tcell2\tcell3\n
+      seems to have two columns + leading tab in the header.  transpose will
+      see two tabs, consider this three columns (the first of which is empty), view
+      this as a three column header which can be
+      padded by adding an empty column, resulting in two empty columns.
 
  * TODO
-    - encapsulate
-       - input reading
-       - add_fake_tab offset fiddling. data[1] g_nl
-       - removed_last_newline logic
+    - enable format-preservation without adding leading tab if header line is short.
+    - allow mapping of empty/NaN/NA/-/ fields.
+    - encapsulate input reading
     ? Open output file only if tests are passed.
-    # account for missing tab in header line .... (count mismatch)
-    # warn for count mismatches / output counts
-    # gzread
     ? write row, col labels
     / test with empty lines (rec_offset stress-test)
     / test with all-empty fields
-    ? optify na/nan/-/empty output fields
 */
 
 #include <stdio.h>
@@ -41,11 +47,13 @@ unsigned char g_nl  = '\n';
 int removed_last_newline = 0;
 
 
-#define G_CHECK_RECTANGULAR   1
-#define G_CHECK_VERBOSE       2
-#define G_CHECK_ALL           (G_CHECK_RECTANGULAR | G_CHECK_VERBOSE)
 
-int g_debug = 0, g_check = 0, g_strict = 1, g_mike = 1;
+#define DEBUG_MATRIX     (1 << 0)
+#define DEBUG_ROW        (1 << 1)
+#define DEBUG_CELL       (1 << 2)
+
+unsigned g_debug = 0;
+int g_check = 0, g_pad = 0, g_normalise = 1, g_verbose = 1;
 
 
 
@@ -65,17 +73,18 @@ int field_check_ok
 ,  struct offset* offsets
 ,  unsigned long n_offsets
 )
-   {  int ret = 1
+   {  int delta = 1
    ;  unsigned long i = 0
+   ;  unsigned long n_nok = 0
 
    ;  for (i=0;i<n_offsets-1;i++)
       {  unsigned char* o = data+offsets[i].this, *p = o, *z = o + offsets[i].next
       ;  while (p < z && (p = memchr(p, g_tab, offsets[i].next - offsets[i].this - (p-o))))
             offsets[i].n_sep++
          ,  p++
-;if (g_debug)
-fprintf(stderr, "line %lu this %lu next %lu nsep %lu\n", i, offsets[i].this, offsets[i].next, offsets[i].n_sep)
-   ;  }
+;if (g_debug & DEBUG_ROW)
+ fprintf(stderr, "line %lu this %lu next %lu nsep %lu\n", i, offsets[i].this, offsets[i].next, offsets[i].n_sep)
+;     }
 
                            /* In check/strict mode we compare with the *second* record.
                             * The first record may have things going on with the first column
@@ -83,24 +92,43 @@ fprintf(stderr, "line %lu this %lu next %lu nsep %lu\n", i, offsets[i].this, off
                             * the separator may be mising as well.
                            */
       if (n_offsets > 2)
-      {  unsigned long n_nok = 0, reference = offsets[1].n_sep
-      ;  for (i=2;i<n_offsets-1;i++)
+      {  unsigned long reference = offsets[1].n_sep, n_header = offsets[0].n_sep-1
+
+      ;  if (g_debug & DEBUG_MATRIX)
+         fprintf(stderr, "reference count %lu, first line %lu\n", reference, n_header)
+
+      ;  if (n_header != reference && (n_header+1) != reference)
+         {  if (g_verbose)
+            arrr("Header line and second line do not match up (%lu versus %lu)", n_header, reference)
+         ;  if (g_check || !g_pad)
+            exit(1)
+      ;  }
+
+         for (i=2;i<n_offsets-1;i++)
          if (offsets[i].n_sep != reference)
-         {  if (g_check & G_CHECK_VERBOSE)
+         {  if (g_verbose)
             fprintf(stderr, " %lu/%lu", (i+1), (offsets[i].n_sep+1))
          ;  n_nok++
       ;  }
 
          if (n_nok)
-         {  if (g_check & G_CHECK_VERBOSE)
+         {  if (g_verbose)
             fprintf(stderr, " (line no/field count)\n")
-         ;  if (g_mike)
-            arrr("Count discrepancies found, used second line as reference with %lu fields, %lu lines total", reference+1, (n_offsets-1))
-         ;  exit((g_check || g_strict) ? 1 : 0)
+         ;  if (g_verbose)
+            arrr
+            ( "Count discrepancies found (%lu), used second line as reference with %lu fields, %lu lines total"
+            ,  n_nok
+            ,  reference+1
+            , (n_offsets-1)
+            )
+         ;  if(g_check || !g_pad)
+            exit(1)
       ;  }
 
-         if (g_mike)
+         if (g_verbose && !n_nok)
          arrr("Have %lu x %lu matrix", (n_offsets-1), (offsets[1].n_sep+1))
+      ;  else if (g_verbose)
+         arrr("Have ragged matrix with %lu rows", (n_offsets-1))
 
       ;  if (g_check)
          exit(0)
@@ -108,7 +136,7 @@ fprintf(stderr, "line %lu this %lu next %lu nsep %lu\n", i, offsets[i].this, off
                            /* NOTE for the first line an artificial separator was added (add_fake_tab)
                             * Hence we do not have offsets[0].n_sep+1 as above
                            */
-      else if (n_offsets == 2 && g_mike)
+      else if (n_offsets == 2 && g_verbose)
       arrr("Have %lu x %lu matrix", (n_offsets-1), (offsets[0].n_sep))
    ;  else
       arrr("Have 0 x 0 matrix")     /* This is unreachable code; an empty file will be considered
@@ -125,16 +153,17 @@ fprintf(stderr, "line %lu this %lu next %lu nsep %lu\n", i, offsets[i].this, off
                       * because if the identity is true we have in fact an off-by-one situation,
                       * indicating a header line with one fewer element than the second line.
                      */
-/* arrr(" - %lu - %lu - %lu -\n", i, offsets[0].n_sep, offsets[1].n_sep); */
-      if (i >= 2 && offsets[0].n_sep == offsets[1].n_sep && g_mike)
+      if (i >= 2 && offsets[0].n_sep == offsets[1].n_sep && n_nok == 0 && g_normalise)
+      {  if (g_verbose)
          arrr
          (  "first and second line have %lu and %lu separators; I'll add a leading separator"
          ,  offsets[0].n_sep-1
          ,  offsets[1].n_sep
          )
-      ,  ret = 0
+      ;  delta = 0
+   ;  }
 
-   ;  return ret
+      return delta
 ;  }
 
 
@@ -146,11 +175,11 @@ void do_transpose
 ,  unsigned long n_offsets
 ,  int zippit
 )
-   {  int n_active
+   {  int n_active, n_rows = 0
    ;  if (field_check_ok(data, N, offsets, n_offsets))
          offsets[0].this = 1       /* No need to parse the fake tab */
       ,  data[1] = g_nl            /* Not meaningful; still need to test this however. */
-   ;  do 
+   ;  do
       {  unsigned long i
       ;  n_active = 0           /* this keeps track whether an unfinished input column still exists */
       ;  for (i=0; i<n_offsets-1;i++)
@@ -186,7 +215,8 @@ void do_transpose
             gzputc(fpo, g_nl)
          ;  else
 #endif
-          putc(g_nl, fpo)
+            putc(g_nl, fpo)
+         ;  n_rows++
       ;  }
       }
       while (n_active > 0)
@@ -220,31 +250,30 @@ int main
    ;
 
 /* enter macromagical option world */
-      
+
       arg_switch()
 
       optarg("-i")  g_fnin = thearg();  endarg()
       optarg("-o")  g_fnout = thearg();  endarg()
       optarg("-t")  g_tab  = thearg()[0];  endarg()
       optarg("-n")  g_nl   = thearg()[0];  endarg()
-      uniarg("--debug")  g_debug = 1; endarg()
+      uniarg("--debug")  g_debug |= DEBUG_MATRIX; endarg()
+      uniarg("-z")  g_debug = 1 | (g_debug << 1); endarg()
 #if WE_USE_ZLIB
       uniarg("--nozip")  zippit = 0;  endarg()
 #endif
-      uniarg("--check")          g_check = G_CHECK_RECTANGULAR; endarg()
-      uniarg("--check-verbose")  g_check = G_CHECK_ALL; endarg()
-      uniarg("--pad-ragged") g_strict = 0; endarg()
-      uniarg("--quiet") g_mike = 0; endarg()
+      uniarg("--check")          g_check = 1; endarg()
+      uniarg("--pad-ragged")     g_pad = 1; g_normalise = 0; endarg()
+      uniarg("--quiet")          g_verbose = 0; endarg()
    uniarg("-h")
 puts("-i <fname>        input stream (gzipped file allowed)");
 puts("-o <fname>        output stream (gzipped file allowed)");
 puts("-t <CHAR>         field delimiter (default TAB)");
 puts("-n <CHAR>         record delimiter (default NEWLINE)");
+puts("--pad-ragged      allow ragged table input, pad output");
 puts("--debug           output record offset information");
 puts("--quiet           no messages");
 puts("--check           check table consistency (rectangulosity) and exit");
-puts("--check-verbose   as above, output offending lines + field counts");
-puts("--pad-ragged      allow ragged table input, pad output");
 #if WE_USE_ZLIB
 puts("--nozip           do not gzip the output");
 #endif
@@ -303,7 +332,7 @@ exit(0);
    ;  }
 
       myfzclose(input, 1)
-   ;  if (g_mike)
+   ;  if (g_verbose)
       arrr("Read %lu bytes", N-2)
 
    ;  if (g_nl != '\n' && data[N-1] == '\n')
