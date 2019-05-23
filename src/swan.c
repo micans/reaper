@@ -276,10 +276,10 @@ int do_align
 
    ;  cell = ai.max_ij
 
-   ;  if (g_cell && (g_cell < ai.nj+1 || g_cell >= ai.ni * ai.nj))
+   ;  if (g_cell && !(g_cell < ai.nj+1 || g_cell >= ai.ni * ai.nj))
       cell = g_cell
 
-;if(0)fprintf(stderr, "DO ALIGN %d\n", (int) cell)
+;if(1)fprintf(stderr, "DO ALIGN %d (%d) (%d)\n", (int) cell, (int) ai.nj+1, (int) (ai.ni * ai.nj -1))
    ;  if (swp->flags & (SW_NW_TRACE | SW_NW_CODE))
       sw_trace_nw(&ai, swp, cell)
    ;  else sw_trace(&ai, swp, cell)
@@ -400,9 +400,9 @@ fprintf(stderr, "-- %s %d\n", thequery->annot, (int) n_todo);
    sw_dump(&ai)
 
       ;  if (swp->flags & (SW_NW_TRACE | SW_NW_CODE))
-         sw_trace(&ai, swp, ai.ni * ai.nj -1)
+         sw_trace_nw(&ai, swp, ai.ni * ai.nj -1)
       ;  else
-         sw_trace_nw(&ai, swp, ai.max_ij)
+         sw_trace(&ai, swp, ai.max_ij)
 
 ;if(0)fprintf(stderr, "found id %d\n", (int) ai.aln_identity)
       ;  if (id_threshold)
@@ -789,9 +789,10 @@ exit(0);
 
       uniarg("--verbose") swp.flags |= SW_VERBOSE; endarg()
       uniarg("--no-trimleft") swp.flags |= SW_TRIMLEFT; swp.flags ^= SW_TRIMLEFT; endarg()
+      uniarg("--notrim") swp.flags |= SW_TRIM; swp.flags ^= SW_TRIM; endarg()
       uniarg("--no-trimright") swp.flags |= SW_TRIMRIGHT; swp.flags ^= SW_TRIMRIGHT; endarg()
       uniarg("--skip-same-name")  g_compare_name = 1; endarg()
-      uniarg("--nw")  swp.flags |= ( SW_NW_FILL | SW_NW_TRACE ); swp.flags ^= SW_TRIM;  endarg()
+      uniarg("--nw")  swp.flags |= ( SW_NW_FILL | SW_NW_TRACE ); endarg()
       uniarg("--nw-fill") swp.flags |= SW_NW_FILL; endarg()
       uniarg("--nw-trace") swp.flags |= SW_NW_TRACE; endarg()
       uniarg("--nw-code") swp.flags |= SW_NW_CODE; endarg()
@@ -836,6 +837,9 @@ exit(0);
       arg_done()
 
 /* exit macromagicalitaciousness */
+
+   ;  if (swp.flags & ( SW_NW_FILL | SW_NW_TRACE ))
+      swp.flags |= SW_TRIM; swp.flags ^= SW_TRIM
 
    ;  if (g_grep && !theidentity)
       die(1, "grep functionality requires setting an identity threshold")

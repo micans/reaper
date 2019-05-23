@@ -203,7 +203,8 @@ int sw_fill_nw
 
    ;  if (nw)
       for (j=0;j<ai->nj;j++)
-      elem(ai, 0, j) = (ai->nj - j) * COST_GAPLEFT
+      // elem(ai, 0, j) = (ai->nj - j) * COST_GAPLEFT
+      elem(ai, 0, j) = (- j) * COST_GAPLEFT
 
    ;  ai->n_cells_used = 0
 
@@ -220,7 +221,8 @@ int sw_fill_nw
       ;  ai->n_cells_used += maxj
 
       ;  if (nw)
-         elem(ai, i, 0) = (ai->ni - i) * COST_GAPRIGHT
+         // elem(ai, i, 0) = (ai->ni - i) * COST_GAPRIGHT
+         elem(ai, i, 0) = ( - i) * COST_GAPRIGHT
       ;  else
          elem(ai, i, 0) = 0
 

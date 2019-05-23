@@ -3,7 +3,8 @@
 /* Author: Stijn van Dongen
 
  * features:
-    - is close to doing the very minimal amount of work required
+    - close to doing the very minimal amount of work required
+    - no limits on matrix size; limited by available memory
     - transpose tabular data without using in-memory transpose
     - read data as string, write transpose by following array of pointers
     - record and field separator can be changed.
@@ -30,7 +31,6 @@
     ? Open output file only if tests are passed.
     ? write row, col labels
     / test with empty lines (rec_offset stress-test)
-    / test with all-empty fields
 */
 
 #include <stdio.h>
