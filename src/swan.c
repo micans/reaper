@@ -828,7 +828,7 @@ exit(0);
       uniarg("--grepv")  g_grep |= 2; endarg()
       uniarg("--grepv-identifiers") g_grepv_format = GREPV_FORMAT_IDLIST; endarg()
       optarg("-grepv-o")      g_fnout_grepv = thearg(); endarg()
-      optarg("-index") index_kmer = atoi(thearg()); if (index_kmer > 12) index_kmer = 12; endarg()
+      optarg("-index") index_kmer = atoi(thearg()); if (index_kmer > 20) index_kmer = 20; endarg()
       optarg("-n-seeds") g_n_seeds = atoi(thearg()); endarg()
       optarg("-w-seeds") g_w_seeds = atoi(thearg()); endarg()
       optarg("-q")  fnquery  = thearg();  endarg()
