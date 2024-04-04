@@ -78,7 +78,7 @@ struct req
 
 
 struct kmer_x_req
-{  unsigned  kmer
+{  unsigned long  kmer
 ;  unsigned  req_index
 ;
 }  ;
@@ -550,30 +550,35 @@ int kxr_cmp_kmr
    ;  return 0
 ;  }
 
+#define KMASK(thek) ((1UL << 2*((unsigned long) thek)) -1)
 
-void make_index
+unsigned long make_index
 (  struct req* rs
 ,  struct kmer_index* kidx
 ,  unsigned k
+,  int build_all
 )
    {  unsigned total_length = req_total_kmer_length(rs, k)
-#define KMASK ((1 << 2*k) -1)
+
    ;  struct req* r = rs
    ;  struct kmer_x_req* kxr
-   ;  unsigned xi = 0
+   ;  unsigned long xi = 0
 
    ;  kidx->k = k
    ;  if (!k)
-      return
+      return 0
 
-   ;  kidx->kxr_offset = myalloc((KMASK+1) * sizeof kidx->kxr_offset[0])
-   ;  kidx->kxr_length = myalloc((KMASK+1) * sizeof kidx->kxr_length[0])
-   ;  kxr = kidx->kxr  = myalloc(total_length * sizeof kxr[0])
+   ;  if (build_all)
+      {  kidx->kxr_offset = myalloc((KMASK(k)+1) * sizeof kidx->kxr_offset[0])
+      ;  kidx->kxr_length = myalloc((KMASK(k)+1) * sizeof kidx->kxr_length[0])
+   ;  }
+      kxr = kidx->kxr  = myalloc(total_length * sizeof kxr[0])
 
    ;  argh("swan", "building %d-mer index (use -index 0 to run without index)", (int) k)
 
    ;  while (r->s)
-      {  unsigned i, kmer = 0
+      {  unsigned i
+      ;  unsigned long kmer = 0
       ;  int last_N = -1
       ;  for ( i=0; i < r->slen; i++ )
          {  unsigned base = BASEMAP((unsigned char) r->s[i])
@@ -583,30 +588,36 @@ void make_index
          ;  else if (base < 4)
             kmer |= base
          ;  if (last_N + k <= i)
-            {  kxr[xi].kmer = kmer & KMASK
+            {  kxr[xi].kmer = kmer & KMASK(k)
             ;  kxr[xi].req_index = r - rs
+;if(0)fprintf(stderr, "%lu %u\n", kxr[xi].kmer, kxr[xi].req_index)
             ;  xi++
          ;  }
          }
          r++
    ;  }
 
+      if (build_all)
       {  int i
-      ;  for (i=0; i<=KMASK; i++)         /* all counts to zero */
+      ;  for (i=0; i<=KMASK(k); i++)         /* all counts to zero */
          kidx->kxr_length[i] = 0
 
       ;  for (i=0; i<xi; i++)             /* count what's there .. */
          kidx->kxr_length[kxr[i].kmer]++
 
       ;  kidx->kxr_offset[0] = 0          /* set offsets */
-      ;  for (i=1; i<=KMASK; i++)
+      ;  for (i=1; i<=KMASK(k); i++)
          kidx->kxr_offset[i] = kidx->kxr_offset[i-1] + kidx->kxr_length[i-1]
 
-      ;  qsort(kxr, xi, sizeof kxr[0], kxr_cmp_kmr)
-      ;  for (i=0; i<=KMASK; i++)
+   ;  }
+      qsort(kxr, xi, sizeof kxr[0], kxr_cmp_kmr)
+   ;  if (build_all)
+      {  int i
+      ;  for (i=0; i<=KMASK(k); i++)
          qsort(kxr+kidx->kxr_offset[i], kidx->kxr_length[i], sizeof kxr[0], kxr_cmp_req)
    ;  }
-   }
+      return xi
+;  }
 
 
 
@@ -710,6 +721,33 @@ struct req* read_fasta_file
 ;  }
 
 
+static char getbase[4] = { 'A', 'C', 'G', 'T' };
+#define LSIZE(k)     (1UL << (2*((unsigned long) k)))    /* language size, 4096, 16384          */
+#define LOMEGA(k)    (LSIZE((unsigned long) k)-1)      /* last (all-one) word, 4095, 16383,   */
+
+         /* Get the word that corresponds to a hash
+         */
+char* get_sylmer
+(  int k
+,  unsigned long sylid
+,  char buf[101]
+)
+   {  int i
+
+   ;  if (sylid < 0 || sylid > LOMEGA(k))
+      {  for (i=0;i<k;i++)
+         buf[i] = 'X'
+   ;  }
+      else
+      for (i=0;i<k;i++)
+      buf[i] = getbase[(sylid >> (2*(k-i-1))) & 3]
+
+   ;  buf[k] = '\0'
+   ;  return buf
+;  }
+
+
+
 int main
 (  int argc
 ,  char* argv[]
@@ -726,6 +764,7 @@ int main
    ;  unsigned index_kmer = 0
    ;  unsigned theidentity = 0
    ;  unsigned limit = 0
+   ;  unsigned B_concordance = 0
 
    ;  const char* singleref = NULL, *singlequery = NULL
    ;  const char* fnref = NULL, *fnquery = NULL
@@ -762,6 +801,7 @@ puts("-q-string <string> e.g. hsa, mmu; only matching identifiers are considered
 puts("-r-string <string> e.g. hsa, mmu; only matching identifiers are considered");
 puts("-identity <int>   require matches with at least <int> identity (0-100)");
 puts("-index <int>      k-mer size to build index on (suggest 8 to 12; filters on k-mer match!)");
+puts("-concordance <int> as -index, build index and output as concordance");
 puts("-n-seeds <int>    require <int> independent k-mer hits for a match to be considered (overlap not allowed)");
 puts("-w-seeds <int>    require two seeds spanning at least <int> bases (overlap allowed)");
 puts("--grep            output sequences that match the reference (requires -identity)");
@@ -828,7 +868,8 @@ exit(0);
       uniarg("--grepv")  g_grep |= 2; endarg()
       uniarg("--grepv-identifiers") g_grepv_format = GREPV_FORMAT_IDLIST; endarg()
       optarg("-grepv-o")      g_fnout_grepv = thearg(); endarg()
-      optarg("-index") index_kmer = atoi(thearg()); if (index_kmer > 12) index_kmer = 12; endarg()
+      optarg("-index") index_kmer = atoi(thearg()); if (index_kmer > 15) die(1, "index cannot exceed 16"); endarg()
+      optarg("-concordance") index_kmer = atoi(thearg()); B_concordance = 1; if (index_kmer > 32) die(1, "concordance index cannot exceed 32"); endarg()
       optarg("-n-seeds") g_n_seeds = atoi(thearg()); endarg()
       optarg("-w-seeds") g_w_seeds = atoi(thearg()); endarg()
       optarg("-q")  fnquery  = thearg();  endarg()
@@ -839,9 +880,11 @@ exit(0);
 /* exit macromagicalitaciousness */
 
    ;  if (swp.flags & ( SW_NW_FILL | SW_NW_TRACE ))
-      swp.flags |= SW_TRIM; swp.flags ^= SW_TRIM
+      {  swp.flags |= SW_TRIM
+      ;  swp.flags ^= SW_TRIM
+   ;  }
 
-   ;  if (g_grep && !theidentity)
+      if (g_grep && !theidentity)
       die(1, "grep functionality requires setting an identity threshold")
 
    ;  if (singleref && fnquery)
@@ -876,6 +919,7 @@ exit(0);
 
       ;  unsigned* todo = myalloc(nref * sizeof todo[0])
       ;  unsigned n_todo = 0
+      ;  unsigned long n_index_items = 0;
 
       ;  struct kmer_index ref_index = { 0 }
 
@@ -885,9 +929,27 @@ exit(0);
             todo[i] = i
       ;  }
 
-         make_index(ls_ref, &ref_index, index_kmer)   /* works always .. but no index when k == 0 */
+                                          /* some scary stuff going on here.
+                                           * if B_concordance, then some big data structures are not built.
+                                           * below works always, but no index is made when k == 0.
+                                          */
+         n_index_items = make_index(ls_ref, &ref_index, index_kmer, 1 - B_concordance)
 
-      ;  if (singlequery)
+      ;  if (B_concordance)
+         {  unsigned long i
+				 ;	char buf[101]
+         ;  struct kmer_x_req* kxr = ref_index.kxr
+         ;  for (i=0; i<n_index_items; i++)
+            {  int change = !i || kxr[i].kmer != kxr[i-1].kmer
+            ;  if (change)
+               printf("%s%s\t", (i ? "\n" : ""), get_sylmer(index_kmer, kxr[i].kmer, buf));
+            ;  printf("%s%s", (change ? "" : ","), ls_ref[kxr[i].req_index].annot)
+         ;  }
+            putc('\n', stdout)
+         ;  exit(0)
+      ;  }
+
+         if (singlequery)
          {  query_single[0].s = stringle("%s", singlequery)
          ;  query_single[0].annot = stringle("(query)")
          ;  ls_query = query_single

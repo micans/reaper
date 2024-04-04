@@ -98,7 +98,7 @@ NOTES
 
 
 #ifndef MAXFIELDSIZE
-#  define MAXFIELDSIZE  1023
+#  define MAXFIELDSIZE  16384
 #endif
 
 
