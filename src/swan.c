@@ -870,6 +870,7 @@ exit(0);
       optarg("-grepv-o")      g_fnout_grepv = thearg(); endarg()
       optarg("-index") index_kmer = atoi(thearg()); if (index_kmer > 15) die(1, "index cannot exceed 15"); endarg()
       optarg("-concordance") index_kmer = atoi(thearg()); B_concordance = 1; if (index_kmer > 31) die(1, "concordance index cannot exceed 31"); endarg()
+      optarg("-concordancex") index_kmer = atoi(thearg()); B_concordance = 3; if (index_kmer > 31) die(1, "concordance index cannot exceed 31"); endarg()
       optarg("-n-seeds") g_n_seeds = atoi(thearg()); endarg()
       optarg("-w-seeds") g_w_seeds = atoi(thearg()); endarg()
       optarg("-q")  fnquery  = thearg();  endarg()
@@ -933,20 +934,30 @@ exit(0);
                                            * if B_concordance, then some big data structures are not built.
                                            * below works always, but no index is made when k == 0.
                                           */
-         n_index_items = make_index(ls_ref, &ref_index, index_kmer, 1 - B_concordance)
+         n_index_items = make_index(ls_ref, &ref_index, index_kmer, !B_concordance)
 
       ;  if (B_concordance)
-         {  unsigned long i
+         {  unsigned long xi, offset = 0, stretch = 1, j                              /* note stretch = 1 ... */
+         ;  int multi_only = (B_concordance & 2)
 				 ;	char buf[101]
          ;  struct kmer_x_req* kxr = ref_index.kxr
-         ;  for (i=0; i<n_index_items; i++)
-            {  int change = !i || kxr[i].kmer != kxr[i-1].kmer
-            ;  if (change)
-               printf("%s%s\t", (i ? "\n" : ""), get_sylmer(index_kmer, kxr[i].kmer, buf));
-            ;  printf("%s%s", (change ? "" : ","), ls_ref[kxr[i].req_index].annot)
+         ;  for (xi=1; xi<=n_index_items; xi++)                                       /* .. combines with xi=1 start */
+            {  int end = (xi == n_index_items)                                        /* our index runs over the array size .. */
+            ;  int change = !end && kxr[xi].kmer != kxr[xi-1].kmer                    /* .. so we need && shortcut here; chicanery */
+            ;  if (change || end)
+               {  if (!multi_only || stretch > 1)
+                  {  printf("%s\t", get_sylmer(index_kmer, kxr[offset].kmer, buf));
+                  ;  for (j=0; j<stretch; j++)
+                     printf("%s%s", (j ? "," : ""), ls_ref[kxr[offset+j].req_index].annot)
+                  ;  putc('\n', stdout)
+               ;  }
+                  offset = xi
+               ;  stretch = 1
+            ;  }
+               else
+               stretch++
          ;  }
-            putc('\n', stdout)
-         ;  exit(0)
+            exit(0)
       ;  }
 
          if (singlequery)
