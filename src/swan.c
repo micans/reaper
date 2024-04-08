@@ -552,6 +552,23 @@ int kxr_cmp_kmr
 
 #define KMASK(thek) ((1UL << 2*((unsigned long) thek)) -1)
 
+
+unsigned destructive_quash       /* used with concordance; destruction is ok */
+(  struct kmer_x_req* kidx
+,  unsigned n
+)
+   {  unsigned i, target = 0
+   ;  for (i=1; i<n; i++)
+      {  if (kidx[i].req_index != kidx[target].req_index)
+         {  target++ 
+         ;  if (target != i)
+            kidx[target] = kidx[i]
+      ;  }
+      }
+      return target+1
+;  }
+
+
 unsigned long make_index
 (  struct req* rs
 ,  struct kmer_index* kidx
@@ -602,10 +619,10 @@ unsigned long make_index
       ;  for (i=0; i<=KMASK(k); i++)         /* all counts to zero */
          kidx->kxr_length[i] = 0
 
-      ;  for (i=0; i<xi; i++)             /* count what's there .. */
+      ;  for (i=0; i<xi; i++)                /* count what's there .. */
          kidx->kxr_length[kxr[i].kmer]++
 
-      ;  kidx->kxr_offset[0] = 0          /* set offsets */
+      ;  kidx->kxr_offset[0] = 0             /* set offsets */
       ;  for (i=1; i<=KMASK(k); i++)
          kidx->kxr_offset[i] = kidx->kxr_offset[i-1] + kidx->kxr_length[i-1]
 
@@ -613,7 +630,7 @@ unsigned long make_index
       qsort(kxr, xi, sizeof kxr[0], kxr_cmp_kmr)
    ;  if (build_all)
       {  int i
-      ;  for (i=0; i<=KMASK(k); i++)
+      ;  for (i=0; i<=KMASK(k); i++)         /* sort by sequence identifier/record-id */
          qsort(kxr+kidx->kxr_offset[i], kidx->kxr_length[i], sizeof kxr[0], kxr_cmp_req)
    ;  }
       return xi
@@ -944,12 +961,16 @@ exit(0);
          ;  for (xi=1; xi<=n_index_items; xi++)                                       /* .. combines with xi=1 start */
             {  int end = (xi == n_index_items)                                        /* our index runs over the array size .. */
             ;  int change = !end && kxr[xi].kmer != kxr[xi-1].kmer                    /* .. so we need && shortcut here; chicanery */
+
             ;  if (change || end)
-               {  if (!multi_only || stretch > 1)
-                  {  printf("%s\t", get_sylmer(index_kmer, kxr[offset].kmer, buf));
-                  ;  for (j=0; j<stretch; j++)
-                     printf("%s%s", (j ? "," : ""), ls_ref[kxr[offset+j].req_index].annot)
-                  ;  putc('\n', stdout)
+               {  int nq
+               ;  qsort(kxr+offset, stretch, sizeof kxr[0], kxr_cmp_req)
+               ;  nq = destructive_quash(kxr+offset, stretch)
+               ;  if (!multi_only || nq > 1)
+                  {  fprintf(fpo, "%s\t", get_sylmer(index_kmer, kxr[offset].kmer, buf));
+                  ;  for (j=0; j<nq; j++)
+                     fprintf(fpo, "%s%s", (j ? "," : ""), ls_ref[kxr[offset+j].req_index].annot)
+                  ;  putc('\n', fpo)
                ;  }
                   offset = xi
                ;  stretch = 1
@@ -957,7 +978,8 @@ exit(0);
                else
                stretch++
          ;  }
-            exit(0)
+            fclose(fpo)
+         ;  exit(0)
       ;  }
 
          if (singlequery)
