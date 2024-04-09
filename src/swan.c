@@ -633,7 +633,9 @@ unsigned long make_index
       ;  for (i=0; i<=KMASK(k); i++)         /* sort by sequence identifier/record-id */
          qsort(kxr+kidx->kxr_offset[i], kidx->kxr_length[i], sizeof kxr[0], kxr_cmp_req)
    ;  }
-      return xi
+
+      argh("swan", "done building (%lu k-mers total)", xi)
+   ;  return xi
 ;  }
 
 

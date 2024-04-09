@@ -1067,9 +1067,7 @@ int get_qqq_offset
          ;  n_lt -= hist[median-1]
          ;  median--
       ;  }
-;if(0)fprintf(stderr, " %2d-%2d-%d", ji median, ji rgt, ji i);
       }
-;if(0)fputc('\n', stderr);
       {  int j = (i+1+winofs)-winlen
       ;  if (j > rec->q_n)
          j = rec->q_n
