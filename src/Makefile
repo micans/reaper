@@ -41,6 +41,11 @@ ifdef R_INCLUDE_DIR
 endif
 
 
+SKT = unsigned long
+ifeq ("$(SWANINDEXBITS)", "128")
+   SKT = unsigned __int128
+endif
+
 
 ifeq ("$(T)", "optim")
 	CMAIN = $(COPTIM)
@@ -73,7 +78,7 @@ else
    $(error Not supported type for TSW: $(TSW))
 endif
 
-CSW = -DSWNUM=$(sw_format)
+CSW = -DSWNUM="$(sw_format)" -DSWAN_K_TYPE="$(SKT)"
 
 
 all : reaper tally minion swan transpose

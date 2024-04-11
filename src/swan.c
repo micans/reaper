@@ -77,8 +77,14 @@ struct req
 }  ;
 
 
+#ifndef SWAN_K_TYPE
+#     define SWAN_K_TYPE unsigned long
+#endif
+
+#define ktype SWAN_K_TYPE
+
 struct kmer_x_req
-{  unsigned long  kmer
+{  ktype kmer
 ;  unsigned  req_index
 ;
 }  ;
@@ -550,7 +556,7 @@ int kxr_cmp_kmr
    ;  return 0
 ;  }
 
-#define KMASK(thek) ((1UL << 2*((unsigned long) thek)) -1)
+#define KMASK(thek) ((((ktype) 1ULL) << 2*((ktype) thek)) -1)
 
 
 unsigned destructive_quash       /* used with concordance; destruction is ok */
@@ -591,23 +597,23 @@ unsigned long make_index
    ;  }
       kxr = kidx->kxr  = myalloc(total_length * sizeof kxr[0])
 
-   ;  argh("swan", "building %d-mer index (use -index 0 to run without index)", (int) k)
+   ;  argh("swan", "building %d-mer index (use -index 0 to run without index) (kmer/llu/int18=%d/%d/%d)", (int) k, sizeof(ktype), sizeof(long long unsigned), sizeof( __int128))
 
    ;  while (r->s)
       {  unsigned i
-      ;  unsigned long kmer = 0
+      ;  ktype kmer = 0
       ;  int last_N = -1
       ;  for ( i=0; i < r->slen; i++ )
          {  unsigned base = BASEMAP((unsigned char) r->s[i])
-         ;  kmer = (kmer << 2)
+         ;  kmer = (kmer << (ktype)2)
          ;  if (base == 4)
             last_N = i
          ;  else if (base < 4)
-            kmer |= base
+            kmer |= (ktype) base
          ;  if (last_N + k <= i)
             {  kxr[xi].kmer = kmer & KMASK(k)
             ;  kxr[xi].req_index = r - rs
-;if(0)fprintf(stderr, "%lu %u\n", kxr[xi].kmer, kxr[xi].req_index)
+;if(0)fprintf(stderr, "%llu %u\n", (long long unsigned) kxr[xi].kmer, kxr[xi].req_index)
             ;  xi++
          ;  }
          }
@@ -741,25 +747,25 @@ struct req* read_fasta_file
 
 
 static char getbase[4] = { 'A', 'C', 'G', 'T' };
-#define LSIZE(k)     (1UL << (2*((unsigned long) k)))    /* language size, 4096, 16384          */
-#define LOMEGA(k)    (LSIZE((unsigned long) k)-1)      /* last (all-one) word, 4095, 16383,   */
+#define LSIZE(k)     (((ktype) 1) << (2*((ktype) k)))    /* language size, 4096, 16384          */
+#define LOMEGA(k)    (LSIZE((ktype) k)-1)      /* last (all-one) word, 4095, 16383,   */
 
          /* Get the word that corresponds to a hash
          */
 char* get_sylmer
 (  int k
-,  unsigned long sylid
+,  ktype sylid
 ,  char buf[101]
 )
    {  int i
 
-   ;  if (sylid < 0 || sylid > LOMEGA(k))
+   ;  if (sylid > LOMEGA(k))
       {  for (i=0;i<k;i++)
          buf[i] = 'X'
    ;  }
       else
       for (i=0;i<k;i++)
-      buf[i] = getbase[(sylid >> (2*(k-i-1))) & 3]
+      buf[i] = getbase[(sylid >> ((ktype)2*(k-i-1))) & (ktype)3]
 
    ;  buf[k] = '\0'
    ;  return buf
@@ -888,8 +894,8 @@ exit(0);
       uniarg("--grepv-identifiers") g_grepv_format = GREPV_FORMAT_IDLIST; endarg()
       optarg("-grepv-o")      g_fnout_grepv = thearg(); endarg()
       optarg("-index") index_kmer = atoi(thearg()); if (index_kmer > 15) die(1, "index cannot exceed 15"); endarg()
-      optarg("-concordance") index_kmer = atoi(thearg()); B_concordance = 1; if (index_kmer > 31) die(1, "concordance index cannot exceed 31"); endarg()
-      optarg("-concordancex") index_kmer = atoi(thearg()); B_concordance = 3; if (index_kmer > 31) die(1, "concordance index cannot exceed 31"); endarg()
+      optarg("-concordance") index_kmer = atoi(thearg()); B_concordance = 1; if (index_kmer > 63) die(1, "concordance index cannot exceed 63"); endarg()
+      optarg("-concordancex") index_kmer = atoi(thearg()); B_concordance = 3; if (index_kmer > 63) die(1, "concordance index cannot exceed 63"); endarg()
       optarg("-n-seeds") g_n_seeds = atoi(thearg()); endarg()
       optarg("-w-seeds") g_w_seeds = atoi(thearg()); endarg()
       optarg("-q")  fnquery  = thearg();  endarg()
@@ -898,6 +904,9 @@ exit(0);
       arg_done()
 
 /* exit macromagicalitaciousness */
+
+   ;  if (B_concordance && index_kmer >= 4 * sizeof(ktype))
+      die(1, "This swan was built to index k-mers up to maximum size %d", 4 * sizeof(ktype) -1)
 
    ;  if (swp.flags & ( SW_NW_FILL | SW_NW_TRACE ))
       {  swp.flags |= SW_TRIM
